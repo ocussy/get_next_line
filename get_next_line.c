@@ -39,6 +39,31 @@ int	ft_strchr(char *s)
 	return(0);
 }
 
+void	ft_bzero(void *s, size_t n)
+{
+	char	*str;
+	size_t	i;
+
+	str = (char *)s;
+	i = 0;
+	while (i < n)
+	{
+		str[i] = '\0';
+		i++;
+	}
+}
+
+void	*ft_calloc(size_t elementCount, size_t elementSize)
+{
+	char	*res;
+
+	res = malloc(elementSize * elementCount);
+	if (!res)
+		return (NULL);
+	ft_bzero(res, elementSize * elementCount);
+	return (res);
+}
+
 char	*ft_strjoin(char *s1, char *s2)
 {
 	char	*str;
@@ -49,12 +74,7 @@ char	*ft_strjoin(char *s1, char *s2)
 	i = -1;
 	j = 0;
 	if (!s1)
-	{
-		s1 = malloc(sizeof(char) * 1);
-		s1[0] = '\0';
-	}
-	if (!s1 || !s2)
-		return NULL;
+		s1 = ft_calloc(1, 1);
 	total_len = ft_strlen(s1) + ft_strlen(s2);
 	str = malloc((total_len + 1) * sizeof(char));
 	if (!str)
@@ -64,21 +84,18 @@ char	*ft_strjoin(char *s1, char *s2)
 	while (s2[j])
 		str[i++] = s2[j++];
 	str[i] = '\0';
-	free(s1);
 	return (str);
 }
 
-void	*ft_memset(char *s, int c, size_t n)
-{
-	unsigned char	*p;
 
-	p = (unsigned char *)s;
-	while (n > 0)
-	{
-		*p++ = (unsigned char)c;
-		n--;
-	}
-	return (s);
+
+char	*ft_join(char *line, char *buf)
+{
+	char	*tmp;
+
+	tmp = ft_strjoin(line, buf);
+	free(line);
+	return (tmp);
 }
 
 char	*ft_make_line(int fd, char *line)
@@ -86,26 +103,27 @@ char	*ft_make_line(int fd, char *line)
 	char	*buf;
 	int		count;
 
-	buf = malloc(sizeof(char) * (BUFFER_SIZE + 1));
+	if (!line)
+		line = ft_calloc(1, 1);
+	buf = ft_calloc((BUFFER_SIZE + 1), sizeof(char));
 	if (!buf)
+	{
+		free(line);
 		return (NULL);
+	}
 	count = 1;
-	while (ft_strchr(line) != 1 && count != 0)
+	while (count > 0)
 	{
 		count = read(fd, buf, BUFFER_SIZE);
-		if (count == 0 || count == -1)
+		if (count == -1)
 		{
 			free(buf);
 			return(NULL);
 		}
-		if (count != BUFFER_SIZE && count != 0)
-		{
-			line = ft_strjoin(line, buf);
-			free(buf);
-			return (line);
-		}
 		buf[count] = '\0';
-		line = ft_strjoin(line, buf);
+		line = ft_join(line, buf);
+		if (ft_strchr(buf) != 0)
+			break;
 	}
 	free(buf);
 	return (line);
@@ -117,11 +135,11 @@ char	*ft_get_line(char *tempo)
 	int		i;
 
 	i = 0;
+	if (!tempo)
+		return(NULL);
 	while (tempo[i] && tempo[i] != '\n')
 		i++;
-	if (tempo[i] && tempo[i] == '\n')
-		i++;
-	line = malloc(sizeof(char) * (i + 1));
+	line = ft_calloc((i + 2), sizeof(char));
 	i = 0;
 	while (tempo[i] && tempo[i] != '\n')
 	{
@@ -133,45 +151,50 @@ char	*ft_get_line(char *tempo)
 		line[i] = tempo[i];
 		i++;
 	}
-	line[i] = '\0';
 	return (line);
 }
-void	ft_clean(char *line, char *tempo)
+
+char	*ft_clean(char *line)
 {
-	int i;
-	int	j;
+	int		i;
+	int		j;
+	char	*tmp;
 
 	i = 0;
 	j = 0;
-	tempo = ft_memset(tempo, 0, ft_strlen(tempo));
-	while (line[i] != '\n' && line[i])
-		i++;
-	if (line[i] && line[i] == '\n')
-		i++;
-	while (line[i])
-		tempo[j++] = line[i++];
-	tempo[j] = '\0';
-}
-char	*get_next_line(int fd)
-{
-	char		*final_line;
-	static char	tempo[BUFFER_SIZE + 1];
-	char		*line;
-
-	if (fd < 0 || BUFFER_SIZE <= 0)
-		return (0);
-	line = NULL;
-	if (tempo[0] != '\0')
-		line = ft_strjoin(line, tempo);
-	line = ft_make_line(fd, line);
 	if (!line)
 	{
 		free(line);
 		return (NULL);
 	}
-	final_line = ft_get_line(line);
-	ft_clean(line, tempo);
+	while (line[i] != '\n' && line[i])
+		i++;
+	tmp = ft_calloc((ft_strlen(line) - i + 1), sizeof(char));
+	if (!tmp)
+	{
+		free(line);
+		return (NULL);
+	}
+	if (line[i] && line[i] == '\n')
+		i++;
+	while (line[i])
+		tmp[j++] = line[i++];
 	free(line);
+	return(tmp);
+}
+
+char	*get_next_line(int fd)
+{
+	char		*final_line;
+	static char	*line;
+
+	if (fd < 0 || BUFFER_SIZE <= 0)
+		return (NULL);
+	line = ft_make_line(fd, line);
+	if (!line)
+		return (NULL);
+	final_line = ft_get_line(line);
+	line = ft_clean(line);
 	return (final_line);
 }
 
@@ -179,7 +202,7 @@ int main ()
 {
 	int fd;
     char *line;
-    fd = open("test.txt", O_RDONLY);
+    fd = open("coucou.txt", O_RDONLY);
     if (fd == -1)
     {
         perror("Error opening file");
